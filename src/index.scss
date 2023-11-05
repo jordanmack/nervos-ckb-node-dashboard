@@ -4,22 +4,15 @@
 @tailwind components;
 @tailwind utilities;
 
+// Note: Use of Tailwind [bracket] specifiers can cause a build error. https://bit.ly/47kr6bb
+
 @layer base
 {
 	body
 	{
-		@apply text-zinc-100 leading-relaxed min-w-[375px];
+		@apply text-zinc-100 leading-relaxed;
 		font-family: 'Kumbh Sans', sans-serif;
-		@media (max-width: 767px)
-		{
-			background: black;
-			background-size: 100%;
-		}
-		@media (min-width: 768px)
-		{
-			background: black;
-			background-size: 6400px;
-		}
+		background: black;
 	}
 	h1
 	{
@@ -46,6 +39,6 @@
 	}
 	small
 	{
-		@apply text-[0.7em];
+		font-size: 0.7em;
 	}
 }
