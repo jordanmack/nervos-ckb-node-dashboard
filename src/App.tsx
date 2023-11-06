@@ -11,7 +11,7 @@ const CKB_RPC_URL = 'http://127.0.0.1:8114';		// The JSON RPC URL of the CKB Ful
 const EPOCHS_PER_HALVING = 8760;					// The number of epochs per halving. This should never change.
 const HOURS_PER_EPOCH = 4;							// The number of hours per epoch. This should never change.
 const HALVING_MESSAGE_HIDE_DELAY = 10 * 60 * 1000;	// The delay in milliseconds to continue to display the halving message after it occurs.
-const TICK_DELAY = 450;								// The delay in milliseconds to update the countdown.
+const TICK_DELAY = 500;								// The delay in milliseconds to update the countdown.
 const REFRESH_DELAY = 1.7 * 1000;					// The delay in milliseconds to refresh the RPC data and update the current block and epoch.
 const FULL_REFRESH_DELAY = 5 * 60 * 1000;			// The delay in milliseconds to refresh all RPC data and update all current values and target values.
 const MAX_TX_HISTORY_COUNT = 50;					// The maximum number of entries in the TX history, used for the graph.
@@ -20,6 +20,7 @@ const MAX_TX_HISTORY_COUNT = 50;					// The maximum number of entries in the TX 
  * Types and Defaults
  */
 
+/// History values for a specific block.
 type HistoryState =
 {
 	blockNumber: number;
@@ -27,6 +28,7 @@ type HistoryState =
 	txCount: number;
 };
 
+/// Container for all the current data retrieved from the RPC.
 type CurrentData =
 {
 	block: number,
@@ -47,6 +49,17 @@ type CurrentData =
 	txSize: number
 };
 
+/// A time value separated into components for a future date.
+type TimeValue =
+{
+	months: number,
+	days: number,
+	hours: number,
+	minutes: number,
+	seconds: number
+};
+
+/// The default values for a CurrentData object.
 const currentDataDefault: CurrentData =
 {
 	block: 0,
@@ -75,9 +88,9 @@ const currentDataDefault: CurrentData =
 /**
  * Generates time values in months, days, hours, minutes, and seconds based on the time remaining in the countdown.
  * @param timeFromNow The number of milliseconds until the target time.
- * @returns object
+ * @returns TimeValue
  */
-function calculateTimeValues(timeFromNow: number)
+function calculateTimeValue(timeFromNow: number)
 {
 	// Time constants (in milliseconds).
 	const second = 1000;
@@ -94,7 +107,7 @@ function calculateTimeValues(timeFromNow: number)
 	const seconds = Math.floor((timeFromNow - (minutes * minute + hours * hour + days * day + months * month)) / second);
 
 	// Create the time object from the target values.
-	let object = {months: 0, days: 0, hours: 0, minutes: 0, seconds: 0};
+	let object: TimeValue = {months: 0, days: 0, hours: 0, minutes: 0, seconds: 0};
 	object.months = months;
 	object.days = days;
 	object.hours = hours;
@@ -108,6 +121,7 @@ function calculateTimeValues(timeFromNow: number)
  * Generate the target date string depending on the target epoch and target time.
  * @param targetEpoch The epoch of the next halving.
  * @param targetTime The approximate time of the next halving.
+ * @returns A string containing the target date.
  */
 function generateTargetString(targetEpoch: number, targetTime: number)
 {
@@ -125,8 +139,9 @@ function generateTargetString(targetEpoch: number, targetTime: number)
 }
 
 /**
- * Generate the countdown string.
+ * Generate the countdown string or a halving message immediately after the halving.
  * @param targetTime The approximate time of the next halving.
+ * @returns A string representing the remaining time in the countdown.
  */
 function generateCountdown(targetTime: number)
 {
@@ -138,8 +153,8 @@ function generateCountdown(targetTime: number)
 		// If there is still time remaining then display the countdown, unless it is immediately after the halving within the hide delay window.
 		if(timeRemaining > 0 && timeRemaining < halvingMessageWindow)
 		{
-			const timeValues = calculateTimeValues(timeRemaining);
-			const countdown = `${timeValues.months}m, ${timeValues.days}d, ${timeValues.hours}h, ${timeValues.minutes}m, ${timeValues.seconds}s`;
+			const timeValue = calculateTimeValue(timeRemaining);
+			const countdown = `${timeValue.months}m, ${timeValue.days}d, ${timeValue.hours}h, ${timeValue.minutes}m, ${timeValue.seconds}s`;
 
 			return countdown;
 		}
@@ -156,17 +171,14 @@ function generateCountdown(targetTime: number)
 }
 
 /**
- * Update all or specific data fields using the CKB JSON RPC.
- * @param setTargetTime A React function to set the target time of the next halving, or null to skip.
- * @param setTargetEpoch A React function to set the target epoch of the next halving, or null to skip.
- * @param setCurrentBlock A React function to set the current block number, or null to skip.
- * @param setCurrentEpoch A React function to set the current epoch number, or null to skip.
- * @param setCurrentEpochIndex A React function to set the current epoch index, or null to skip.
- * @param setCurrentEpochLength A React function to set the current epoch length, or null to skip.
+ * Update all data using the CKB JSON RPC.
+ * @param currentData An object containing all the current data elements.
+ * @param setCurrentData A React function to set the current data state variable.
+ * @param options An optional object containing options for updating the data.
  */
 async function updateData(currentData: CurrentData, setCurrentData: React.Dispatch<React.SetStateAction<CurrentData>>, options: {updateTargets: boolean}={updateTargets: true})
 {
-	// Fetch current header info from a CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_tip_header)
+	// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_tip_header)
 	const jsonRpcRequest1 =
 	{
 		"id": 1,
@@ -201,7 +213,7 @@ async function updateData(currentData: CurrentData, setCurrentData: React.Dispat
 	const targetDuration = Math.floor((targetEpoch - (epochNumber + (epochIndex / epochLength))) * HOURS_PER_EPOCH * 60*60*1000); // Time until epoch in milliseconds.
 	const targetTime = Date.now() + targetDuration; // Date in the future when the epoch will occur.
 
-	// Fetch current header info from a CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_blockchain_info)
+	// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_blockchain_info)
 	const jsonRpcRequest2 =
 	{
 		"id": 2,
@@ -223,7 +235,7 @@ async function updateData(currentData: CurrentData, setCurrentData: React.Dispat
 	// Decode values.
 	chainTypeString = (chainTypeString === "ckb") ? "Mainnet" : "Testnet";
 
-	// Fetch current header info from a CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-local_node_info)
+	// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-local_node_info)
 	const jsonRpcRequest3 =
 	{
 		"id": 3,
@@ -246,7 +258,7 @@ async function updateData(currentData: CurrentData, setCurrentData: React.Dispat
 	connectionsNumber = Number(connectionsNumber);
 	nodeVersion = "v" + nodeVersion.split(" ")[0]; // Take only the first version of the string.
 
-	// Fetch current header info from a CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-tx_pool_info)
+	// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-tx_pool_info)
 	const jsonRpcRequest4 =
 	{
 		"id": 4,
@@ -273,7 +285,7 @@ async function updateData(currentData: CurrentData, setCurrentData: React.Dispat
 	totalTxSizeNumber = BigInt(totalTxSizeNumber);
 	txSizeLimitNumber = BigInt(txSizeLimitNumber);
 
-	// Fetch current header info from a CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_block_by_number)
+	// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_block_by_number)
 	const jsonRpcRequest5 =
 	{
 		"id": 5,
@@ -319,6 +331,12 @@ async function updateData(currentData: CurrentData, setCurrentData: React.Dispat
 	setCurrentData(newCurrentData);
 }
 
+/**
+ * Update the tx history state with the current history state provided, if it contains new data.
+ * @param currentHistoryState A HistoryState object with data to be imported.
+ * @param txHistory An array of existing history states.
+ * @param setTxHistory A React function to set the current tx history state variable.
+ */
 async function updateTxHistoryData(currentHistoryState: HistoryState|null, txHistory: Array<HistoryState>, setTxHistory: React.Dispatch<React.SetStateAction<Array<HistoryState>>>|null)
 {
 	// Check the current history to see if the current reported TX count does not already exist.
@@ -339,7 +357,14 @@ async function updateTxHistoryData(currentHistoryState: HistoryState|null, txHis
 	}
 }
 
-function renderGrid3(label: string, value: string, smallValue?: string|undefined)
+/**
+ * Generates a large sized grid panel.
+ * @param label The label to display in the corner.
+ * @param value The primary value displayed in a large font.
+ * @param smallValue The second value displayed in a smaller font.
+ * @returns Rendered React element containing a single grid panel.
+ */
+function renderGridLarge(label: string, value: string, smallValue?: string|undefined)
 {
 	const smallString = (!!smallValue) ? <>{" "}<small>{smallValue}</small></> : null;
 	const html =
@@ -352,7 +377,14 @@ function renderGrid3(label: string, value: string, smallValue?: string|undefined
 	return html;
 }
 
-function renderGrid2(label: string, value: string, smallValue?: string|undefined)
+/**
+ * Generates a small sized grid panel.
+ * @param label The label to display in the corner.
+ * @param value The primary value displayed in a large font.
+ * @param smallValue The second value displayed in a smaller font.
+ * @returns Rendered React element containing a single grid panel.
+ */
+function renderGridSmall(label: string, value: string, smallValue?: string|undefined)
 {
 	const smallString = (!!smallValue) ? <>{" "}<small>{smallValue}</small></> : null;
 	const html =
@@ -365,8 +397,14 @@ function renderGrid2(label: string, value: string, smallValue?: string|undefined
 	return html;
 }
 
+/**
+ * 
+ * @param txHistory A populated HistoryState array containing the data to generate the chart from.
+ * @returns Rendered React element containing the history charts.
+ */
 function renderCharts(txHistory: HistoryState[])
 {
+	/// Generates a tooltip for the chart.
 	const CustomTooltip = ({active, payload, label: _}: TooltipProps<ValueType, NameType>) =>
 	{
 		if(active && payload && payload.length)
@@ -389,7 +427,7 @@ function renderCharts(txHistory: HistoryState[])
 	const html =
 	(
 		<>
-			<AreaChart width={739} height={70} data={txHistory} margin={{top: 0, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
+			<AreaChart width={739} height={69} data={txHistory} margin={{top: 2, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
 				<Tooltip content={()=>null} />
 				<defs>
 					<linearGradient id="colorGreenGradient" x1="0" y1="0" x2="0" y2="1">
@@ -399,7 +437,7 @@ function renderCharts(txHistory: HistoryState[])
 				</defs>
 				<Area type="monotone" dataKey="txCount" stroke="#3cc68a" fillOpacity={1} fill="url(#colorGreenGradient)" isAnimationActive={false} />
 			</AreaChart>
-			<AreaChart width={739} height={70} data={txHistory} margin={{top: 0, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
+			<AreaChart width={739} height={69} data={txHistory} margin={{top: 0, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
 				<Tooltip content={CustomTooltip} offset={50} position={{y: -35}} />
 				<defs>
 					<linearGradient id="purpleGreenGradient" x1="0" y1="0" x2="0" y2="1">
@@ -422,13 +460,20 @@ function App()
 	const [targetString, setTargetString] = useState("");
 	const [txHistory, setTxHistory] = useState(Array(50).fill({blockNumber: 0, cyclesConsumed: 0, txCount: 0}) as Array<HistoryState>);
 
-	// Update the block and epoch from the RPC immediately. 
+	// Update all data from the RPC immediately after first render. 
 	useEffect(()=>{updateData(currentDataDefault, setCurrentData);}, []);
-	// Update the block and epoch from the RPC, but omit the target time and target epoch to allow the countdown to track more smoothly without retargeting every few seconds as a block is found.
-	useInterval(()=>{updateData(currentData, setCurrentData, {updateTargets: false});updateTxHistoryData(currentData.historyState, txHistory, setTxHistory);}, REFRESH_DELAY);
+
+	// Update the data from the RPC, but omit the target time and target epoch to allow the countdown to track more smoothly without retargeting every few seconds as a block is found. Update the tx history data with current data pulled from the RPC.
+	useInterval(()=>
+	{
+		updateData(currentData, setCurrentData, {updateTargets: false}); // Update all data except for the target data.
+		updateTxHistoryData(currentData.historyState, txHistory, setTxHistory); // Update the tx history data with the new RPC data.
+	}, REFRESH_DELAY);
+
 	// Update the all data from the RPC including targets. This will cause the countdown to readjust, which is why the frequency is less often.
 	useInterval(()=>{updateData(currentData, setCurrentData);}, FULL_REFRESH_DELAY);
-	// Update the countdown at the specified tick interval.
+
+	// Update the countdown and target string at the specified tick interval.
 	useInterval(()=>
 	{
 		setCountdown(generateCountdown(currentData.targetTime));
@@ -444,19 +489,19 @@ function App()
 				</a>
 			</section>
 			<section className="mx-auto ml-[61px] grid grid-cols-6 gap-px">
-				{renderGrid3("Block Number", currentData.block.toLocaleString())}
-				{renderGrid3("Epoch", currentData.epoch.toLocaleString(), currentData.epochIndex.toLocaleString()+"/"+currentData.epochLength.toLocaleString())}
-				{renderGrid3("Time to Halving", "", countdown)}
-				{renderGrid3("Next Halving Target", "", targetString)}
-				{renderGrid2("Pending TXs", currentData.pending.toLocaleString())}
-				{renderGrid2("Proposed TXs", currentData.proposed.toLocaleString())}
-				{renderGrid2("Orphan TXs", currentData.orphan.toLocaleString())}
-				{renderGrid2("Total TX Cycles", currentData.totalTxCycles.toLocaleString())}
-				{renderGrid2("Total TX Size", currentData.txSize.toLocaleString())}
-				{renderGrid2("Minimum Fee Rate", currentData.minFeeRate.toLocaleString())}
-				{renderGrid2("Connections", currentData.connections.toLocaleString())}
-				{renderGrid2("Chain Type", currentData.chainType)}
-				{renderGrid2("Node Version", currentData.nodeVersion.toLocaleString())}
+				{renderGridLarge("Block Number", currentData.block.toLocaleString())}
+				{renderGridLarge("Epoch", currentData.epoch.toLocaleString(), currentData.epochIndex.toLocaleString()+"/"+currentData.epochLength.toLocaleString())}
+				{renderGridLarge("Time to Halving", "", countdown)}
+				{renderGridLarge("Next Halving Target", "", targetString)}
+				{renderGridSmall("Pending TXs", currentData.pending.toLocaleString())}
+				{renderGridSmall("Proposed TXs", currentData.proposed.toLocaleString())}
+				{renderGridSmall("Orphan TXs", currentData.orphan.toLocaleString())}
+				{renderGridSmall("Total TX Cycles", currentData.totalTxCycles.toLocaleString())}
+				{renderGridSmall("Total TX Size", currentData.txSize.toLocaleString())}
+				{renderGridSmall("Minimum Fee Rate", currentData.minFeeRate.toLocaleString())}
+				{renderGridSmall("Connections", currentData.connections.toLocaleString())}
+				{renderGridSmall("Chain Type", currentData.chainType)}
+				{renderGridSmall("Node Version", currentData.nodeVersion.toLocaleString())}
 				<div className="inline-block relative bg-gray-800 h-[170px] col-span-6">
 					{renderCharts(txHistory)}
 				</div>
