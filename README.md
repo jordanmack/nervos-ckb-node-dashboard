@@ -6,11 +6,22 @@
 ![Libaries.io](https://img.shields.io/librariesio/release/github/jordanmack/nervos-ckb-node-dashboard)
 ![GitHub Repo stars](https://img.shields.io/github/stars/jordanmack/nervos-ckb-node-dashboard?style=social)
 
-This is a basic web-based dashboard for monitoring of a Nervos CKB L1 node. This allows full node operators to monitor a local node using a friendly UI/UX instead of having to rely exclusively on the console.
+This is a web-based dashboard for monitoring a Nervos CKB L1 node. This allows full node operators to monitor their local node using a friendly UI/UX instead of having to rely exclusively on the console.
+
+The current version is specifically designed to fit a 7" Raspberry Pi screen with a resolution of 800x480. It can be used with higher resolutions, but it is not responsive. Support for more resolutions may be added in the future.
 
 Note: This is not intended for use with a public node since it makes constant RPC requests and relies on methods which are not exposed on public nodes.
 
 ![Screenshot](https://user-images.githubusercontent.com/37931/280556136-825c272e-aa2f-4766-93e1-009e8cd10cc6.png)
+
+## Todo/Wishlist
+
+- Add additional statistics.
+- Add the ability to toggle between views.
+- Add support for more resolutions.
+- Add support for public nodes.
+- Add support for websockets.
+- Refactor code.
 
 ## Developing
 
