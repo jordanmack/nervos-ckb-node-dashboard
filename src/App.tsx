@@ -131,7 +131,7 @@ function generateTargetString(targetEpoch: number, targetTime: number)
 	// Set the target string.
 	if(targetEpoch)
 	{
-		const date = (new Date(targetTime)).toLocaleDateString('en-us', { weekday:"long", year:"numeric", month:"long", day:"numeric"});
+		const date = (new Date(targetTime)).toLocaleDateString('en-us', { weekday:"long", year:"numeric", month:"short", day:"numeric"});
 		string = `${date.replaceAll(' ', ' ')}`;
 	}
 
@@ -482,7 +482,7 @@ function App()
 
 	const html =
 	(
-		<div className="App max-w-[800px] h-[480px] m-auto bg-gray-800 relative">
+		<div className="App max-w-[800px] h-[480px] m-auto bg-gray-800 relative overflow-hidden">
 			<section className="w-[60px] p-2.5 min-h-[480px] float-left bg-gray-700">
 				<a href="https://github.com/jordanmack/nervos-ckb-node-dashboard" target="_blank" rel="noreferrer">
 					<img src="nervos-logo-circle.png" className="w-[40px]" alt="Nervos Logo" />
