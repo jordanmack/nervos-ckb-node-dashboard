@@ -16,11 +16,14 @@ Note: This is not intended for use with a public node since it makes constant RP
 
 ## Todo/Wishlist
 
+- Add online node address configuration.
+- Add error handling for unreachable node.
 - Add additional statistics.
-- Add the ability to toggle between views.
+- Add the ability to toggle between stat views.
 - Add support for more resolutions.
 - Add support for public nodes.
 - Add support for websockets.
+- Create a public website that is usable without compilation.
 - Refactor code.
 
 ## Developing
