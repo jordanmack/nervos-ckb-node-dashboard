@@ -20,9 +20,11 @@ Note: This is not intended for use with a public node since it makes constant RP
 - Add error handling for unreachable node.
 - Add additional statistics.
 - Add the ability to toggle between stat views.
+- Add support for batch RPC requests.
 - Add support for more resolutions.
 - Add support for public nodes.
 - Add support for websockets.
+- Add a help screen to describe what the stats are.
 - Create a public website that is usable without compilation.
 - Refactor code.
 
