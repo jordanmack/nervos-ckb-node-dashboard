@@ -37,10 +37,12 @@ http://ckb-node-dashboard.ckbdev.com/
 - ~~Add support for batch RPC requests.~~
 - Add a help screen to describe what the stats are.
 - Add the ability to toggle between stat views.
+- Add support for light mode and dark mode.
 - Add support for public nodes.
 - Add support for websockets.
 - Add additional statistics.
 - Add troubleshooting FAQ.
+- Add seasonal themes.
 - Refactor code.
 
 ## Developing
