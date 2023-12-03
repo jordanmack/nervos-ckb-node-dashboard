@@ -198,16 +198,40 @@ async function updateData(settings: SettingsObject, currentData: CurrentData, se
 
 	try
 	{
+		// Alias the current reference. Existence is guaranteed by the check above.
 		const ckbRpcUrl = settings.ckbRpcUrl!;
 		
 		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_tip_header)
+		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_blockchain_info)
+		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-local_node_info)
+		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-tx_pool_info)
 		const jsonRpcRequest1 =
-		{
-			"id": 1,
-			"jsonrpc": "2.0",
-			"method": "get_tip_header",
-			"params": []
-		};
+		[
+			{
+				"id": 1,
+				"jsonrpc": "2.0",
+				"method": "get_tip_header",
+				"params": []
+			},
+			{
+				"id": 2,
+				"jsonrpc": "2.0",
+				"method": "get_blockchain_info",
+				"params": []
+			},
+			{
+				"id": 3,
+				"jsonrpc": "2.0",
+				"method": "local_node_info",
+				"params": []
+			},
+			{
+				"id": 4,
+				"jsonrpc": "2.0",
+				"method": "tx_pool_info",
+				"params": []
+			},	
+		];
 		const fetchRequest1 =
 		{
 			method: 'POST',
@@ -217,7 +241,11 @@ async function updateData(settings: SettingsObject, currentData: CurrentData, se
 			},
 			body: JSON.stringify(jsonRpcRequest1)
 		}
-		let {result: {epoch: epochNumberWithFraction, number: blockNumber}} = await fetch(ckbRpcUrl, fetchRequest1).then(res => res.json());
+		let results = await fetch(ckbRpcUrl, fetchRequest1).then(res => res.json());
+		let {result: {epoch: epochNumberWithFraction, number: blockNumber}} = results[0];
+		let {result: {chain: chainTypeString}} = results[1];
+		let {result: {connections: connectionsNumber, version: nodeVersion}} = results[2];
+		let {result: {orphan: orphanTxNumber, pending: pendingTxNumber, proposed: proposedTxNumber, total_tx_cycles: totalTxCyclesNumber, total_tx_size: totalTxSizeNumber, tx_size_limit: txSizeLimitNumber}} = results[3];
 
 		// Decode block number. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#type-blocknumber)
 		blockNumber = Number(blockNumber);
@@ -235,71 +263,10 @@ async function updateData(settings: SettingsObject, currentData: CurrentData, se
 		const targetDuration = Math.floor((targetEpoch - (epochNumber + (epochIndex / epochLength))) * HOURS_PER_EPOCH * 60*60*1000); // Time until epoch in milliseconds.
 		const targetTime = Date.now() + targetDuration; // Date in the future when the epoch will occur.
 
-		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_blockchain_info)
-		const jsonRpcRequest2 =
-		{
-			"id": 2,
-			"jsonrpc": "2.0",
-			"method": "get_blockchain_info",
-			"params": []
-		};
-		const fetchRequest2 =
-		{
-			method: 'POST',
-			headers:
-			{
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify(jsonRpcRequest2)
-		}
-		let {result: {chain: chainTypeString}} = await fetch(ckbRpcUrl, fetchRequest2).then(res => res.json());
-
 		// Decode values.
 		chainTypeString = (chainTypeString === "ckb") ? "Mainnet" : "Testnet";
-
-		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-local_node_info)
-		const jsonRpcRequest3 =
-		{
-			"id": 3,
-			"jsonrpc": "2.0",
-			"method": "local_node_info",
-			"params": []
-		};
-		const fetchRequest3 =
-		{
-			method: 'POST',
-			headers:
-			{
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify(jsonRpcRequest3)
-		}
-		let {result: {connections: connectionsNumber, version: nodeVersion}} = await fetch(ckbRpcUrl, fetchRequest3).then(res => res.json());
-
-		// Decode values.
 		connectionsNumber = Number(connectionsNumber);
 		nodeVersion = "v" + nodeVersion.split(" ")[0]; // Take only the first version of the string.
-
-		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-tx_pool_info)
-		const jsonRpcRequest4 =
-		{
-			"id": 4,
-			"jsonrpc": "2.0",
-			"method": "tx_pool_info",
-			"params": []
-		};
-		const fetchRequest4 =
-		{
-			method: 'POST',
-			headers:
-			{
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify(jsonRpcRequest4)
-		}
-		let {result: {orphan: orphanTxNumber, pending: pendingTxNumber, proposed: proposedTxNumber, total_tx_cycles: totalTxCyclesNumber, total_tx_size: totalTxSizeNumber, tx_size_limit: txSizeLimitNumber}} = await fetch(ckbRpcUrl, fetchRequest4).then(res => res.json());
-
-		// Decode values.
 		orphanTxNumber = BigInt(orphanTxNumber);
 		pendingTxNumber = BigInt(pendingTxNumber);
 		proposedTxNumber = BigInt(proposedTxNumber);
@@ -308,6 +275,7 @@ async function updateData(settings: SettingsObject, currentData: CurrentData, se
 		txSizeLimitNumber = BigInt(txSizeLimitNumber);
 
 		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_block_by_number)
+		// This cannot be batched with the other requests because it requires the current block number as a param.
 		const jsonRpcRequest5 =
 		{
 			"id": 5,
@@ -329,7 +297,7 @@ async function updateData(settings: SettingsObject, currentData: CurrentData, se
 		// Decode values.
 		const historyState = {blockNumber: blockNumber, txCount: transactionsArray.length, cyclesConsumed: cyclesArray.map((x: string)=>Number(x)).reduce((a: number, b: number) => a+b, 0)};
 
-		// Update values.
+		// Update all values with current data.
 		const newCurrentData = {...currentData};
 		newCurrentData.block = blockNumber; // get_tip_header()
 		newCurrentData.epoch = epochNumber; // get_tip_header()
