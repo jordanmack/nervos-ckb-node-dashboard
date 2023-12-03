@@ -1,20 +1,24 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import useInterval from 'react-useinterval';
 import {Area, AreaChart, Tooltip, TooltipProps} from 'recharts';
 import {ValueType, NameType} from 'recharts/types/component/DefaultTooltipContent';
+import Modal from 'react-modal';
+import {ToastContainer, toast} from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import './App.scss';
 
 /**
  * Constants
  */
-const CKB_RPC_URL = 'http://127.0.0.1:8114';		// The JSON RPC URL of the CKB Full Node to query.
-const EPOCHS_PER_HALVING = 8760;					// The number of epochs per halving. This should never change.
-const HOURS_PER_EPOCH = 4;							// The number of hours per epoch. This should never change.
-const HALVING_MESSAGE_HIDE_DELAY = 10 * 60 * 1000;	// The delay in milliseconds to continue to display the halving message after it occurs.
-const TICK_DELAY = 500;								// The delay in milliseconds to update the countdown.
-const REFRESH_DELAY = 1.7 * 1000;					// The delay in milliseconds to refresh the RPC data and update the current block and epoch.
-const FULL_REFRESH_DELAY = 5 * 60 * 1000;			// The delay in milliseconds to refresh all RPC data and update all current values and target values.
-const MAX_TX_HISTORY_COUNT = 100;					// The maximum number of entries in the TX history, used for the graph.
+const CKB_RPC_URL_DEFAULT = 'http://127.0.0.1:8114';	// The JSON RPC URL of the CKB Full Node to query.
+const LOCALSTORAGE_SETTINGS_KEY = "settings";			// The key used with LocalStorage to store the application settings.
+const EPOCHS_PER_HALVING = 8760;						// The number of epochs per halving. This should never change.
+const HOURS_PER_EPOCH = 4;								// The number of hours per epoch. This should never change.
+const HALVING_MESSAGE_HIDE_DELAY = 10 * 60 * 1000;		// The delay in milliseconds to continue to display the halving message after it occurs.
+const TICK_DELAY = 500;									// The delay in milliseconds to update the countdown.
+const REFRESH_DELAY = 1.7 * 1000;						// The delay in milliseconds to refresh the RPC data and update the current block and epoch.
+const FULL_REFRESH_DELAY = 5 * 60 * 1000;				// The delay in milliseconds to refresh all RPC data and update all current values and target values.
+const MAX_TX_HISTORY_COUNT = 100;						// The maximum number of entries in the TX history, used for the graph.
 
 /**
  * Types and Defaults
@@ -47,6 +51,12 @@ type CurrentData =
 	targetTime: number,
 	totalTxCycles: number,
 	txSize: number
+};
+
+/// An object which holds the application settings.
+type SettingsObject =
+{
+	ckbRpcUrl?: string,
 };
 
 /// A time value separated into components for a future date.
@@ -172,163 +182,189 @@ function generateCountdown(targetTime: number)
 
 /**
  * Update all data using the CKB JSON RPC.
+ * @param settings An object with the current application settings.
  * @param currentData An object containing all the current data elements.
  * @param setCurrentData A React function to set the current data state variable.
  * @param options An optional object containing options for updating the data.
  */
-async function updateData(currentData: CurrentData, setCurrentData: React.Dispatch<React.SetStateAction<CurrentData>>, options: {updateTargets: boolean}={updateTargets: true})
+async function updateData(settings: SettingsObject, currentData: CurrentData, setCurrentData: React.Dispatch<React.SetStateAction<CurrentData>>, options: {updateTargets: boolean}={updateTargets: true})
 {
-	// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_tip_header)
-	const jsonRpcRequest1 =
+	// If no custom RPC URL is set, assume settings didn't load yet and skip with a console notice.
+	if(!settings.hasOwnProperty("ckbRpcUrl"))
 	{
-		"id": 1,
-		"jsonrpc": "2.0",
-		"method": "get_tip_header",
-		"params": []
-	};
-	const fetchRequest1 =
+		console.log("No CKB RPC URL was found. Still loading?");
+		return;
+	}
+
+	try
 	{
-		method: 'POST',
-		headers:
+		const ckbRpcUrl = settings.ckbRpcUrl!;
+		
+		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_tip_header)
+		const jsonRpcRequest1 =
 		{
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(jsonRpcRequest1)
-	}
-	let {result: {epoch: epochNumberWithFraction, number: blockNumber}} = await fetch(CKB_RPC_URL, fetchRequest1).then(res => res.json());
-
-	// Decode block number. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#type-blocknumber)
-	blockNumber = Number(blockNumber);
-
-	// Decode the epoch data into usable components. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#type-epochnumberwithfraction)
-	epochNumberWithFraction = BigInt(epochNumberWithFraction);
-	const epochLength = Number((epochNumberWithFraction & 72056494526300160n) >> 40n);
-	const epochIndex = Number((epochNumberWithFraction & 1099494850560n) >> 24n);
-	const epochNumber = Number(epochNumberWithFraction & 16777215n);
-
-	// Calculate the target epoch.
-	const targetEpoch = Math.floor(epochNumber / EPOCHS_PER_HALVING) * EPOCHS_PER_HALVING + EPOCHS_PER_HALVING;
-
-	// Calculate the duration and time of the target epoch.
-	const targetDuration = Math.floor((targetEpoch - (epochNumber + (epochIndex / epochLength))) * HOURS_PER_EPOCH * 60*60*1000); // Time until epoch in milliseconds.
-	const targetTime = Date.now() + targetDuration; // Date in the future when the epoch will occur.
-
-	// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_blockchain_info)
-	const jsonRpcRequest2 =
-	{
-		"id": 2,
-		"jsonrpc": "2.0",
-		"method": "get_blockchain_info",
-		"params": []
-	};
-	const fetchRequest2 =
-	{
-		method: 'POST',
-		headers:
+			"id": 1,
+			"jsonrpc": "2.0",
+			"method": "get_tip_header",
+			"params": []
+		};
+		const fetchRequest1 =
 		{
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(jsonRpcRequest2)
-	}
-	let {result: {chain: chainTypeString}} = await fetch(CKB_RPC_URL, fetchRequest2).then(res => res.json());
+			method: 'POST',
+			headers:
+			{
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(jsonRpcRequest1)
+		}
+		let {result: {epoch: epochNumberWithFraction, number: blockNumber}} = await fetch(ckbRpcUrl, fetchRequest1).then(res => res.json());
 
-	// Decode values.
-	chainTypeString = (chainTypeString === "ckb") ? "Mainnet" : "Testnet";
+		// Decode block number. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#type-blocknumber)
+		blockNumber = Number(blockNumber);
 
-	// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-local_node_info)
-	const jsonRpcRequest3 =
-	{
-		"id": 3,
-		"jsonrpc": "2.0",
-		"method": "local_node_info",
-		"params": []
-	};
-	const fetchRequest3 =
-	{
-		method: 'POST',
-		headers:
+		// Decode the epoch data into usable components. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#type-epochnumberwithfraction)
+		epochNumberWithFraction = BigInt(epochNumberWithFraction);
+		const epochLength = Number((epochNumberWithFraction & 72056494526300160n) >> 40n);
+		const epochIndex = Number((epochNumberWithFraction & 1099494850560n) >> 24n);
+		const epochNumber = Number(epochNumberWithFraction & 16777215n);
+
+		// Calculate the target epoch.
+		const targetEpoch = Math.floor(epochNumber / EPOCHS_PER_HALVING) * EPOCHS_PER_HALVING + EPOCHS_PER_HALVING;
+
+		// Calculate the duration and time of the target epoch.
+		const targetDuration = Math.floor((targetEpoch - (epochNumber + (epochIndex / epochLength))) * HOURS_PER_EPOCH * 60*60*1000); // Time until epoch in milliseconds.
+		const targetTime = Date.now() + targetDuration; // Date in the future when the epoch will occur.
+
+		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_blockchain_info)
+		const jsonRpcRequest2 =
 		{
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(jsonRpcRequest3)
-	}
-	let {result: {connections: connectionsNumber, version: nodeVersion}} = await fetch(CKB_RPC_URL, fetchRequest3).then(res => res.json());
-
-	// Decode values.
-	connectionsNumber = Number(connectionsNumber);
-	nodeVersion = "v" + nodeVersion.split(" ")[0]; // Take only the first version of the string.
-
-	// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-tx_pool_info)
-	const jsonRpcRequest4 =
-	{
-		"id": 4,
-		"jsonrpc": "2.0",
-		"method": "tx_pool_info",
-		"params": []
-	};
-	const fetchRequest4 =
-	{
-		method: 'POST',
-		headers:
+			"id": 2,
+			"jsonrpc": "2.0",
+			"method": "get_blockchain_info",
+			"params": []
+		};
+		const fetchRequest2 =
 		{
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(jsonRpcRequest4)
-	}
-	let {result: {orphan: orphanTxNumber, pending: pendingTxNumber, proposed: proposedTxNumber, total_tx_cycles: totalTxCyclesNumber, total_tx_size: totalTxSizeNumber, tx_size_limit: txSizeLimitNumber}} = await fetch(CKB_RPC_URL, fetchRequest4).then(res => res.json());
+			method: 'POST',
+			headers:
+			{
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(jsonRpcRequest2)
+		}
+		let {result: {chain: chainTypeString}} = await fetch(ckbRpcUrl, fetchRequest2).then(res => res.json());
 
-	// Decode values.
-	orphanTxNumber = BigInt(orphanTxNumber);
-	pendingTxNumber = BigInt(pendingTxNumber);
-	proposedTxNumber = BigInt(proposedTxNumber);
-	totalTxCyclesNumber = BigInt(totalTxCyclesNumber);
-	totalTxSizeNumber = BigInt(totalTxSizeNumber);
-	txSizeLimitNumber = BigInt(txSizeLimitNumber);
+		// Decode values.
+		chainTypeString = (chainTypeString === "ckb") ? "Mainnet" : "Testnet";
 
-	// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_block_by_number)
-	const jsonRpcRequest5 =
-	{
-		"id": 5,
-		"jsonrpc": "2.0",
-		"method": "get_block_by_number",
-		"params": ["0x"+blockNumber.toString(16), "0x2", true] // blockNumber pulled from get_tip_header().
-	};
-	const fetchRequest5 =
-	{
-		method: 'POST',
-		headers:
+		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-local_node_info)
+		const jsonRpcRequest3 =
 		{
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(jsonRpcRequest5)
+			"id": 3,
+			"jsonrpc": "2.0",
+			"method": "local_node_info",
+			"params": []
+		};
+		const fetchRequest3 =
+		{
+			method: 'POST',
+			headers:
+			{
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(jsonRpcRequest3)
+		}
+		let {result: {connections: connectionsNumber, version: nodeVersion}} = await fetch(ckbRpcUrl, fetchRequest3).then(res => res.json());
+
+		// Decode values.
+		connectionsNumber = Number(connectionsNumber);
+		nodeVersion = "v" + nodeVersion.split(" ")[0]; // Take only the first version of the string.
+
+		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-tx_pool_info)
+		const jsonRpcRequest4 =
+		{
+			"id": 4,
+			"jsonrpc": "2.0",
+			"method": "tx_pool_info",
+			"params": []
+		};
+		const fetchRequest4 =
+		{
+			method: 'POST',
+			headers:
+			{
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(jsonRpcRequest4)
+		}
+		let {result: {orphan: orphanTxNumber, pending: pendingTxNumber, proposed: proposedTxNumber, total_tx_cycles: totalTxCyclesNumber, total_tx_size: totalTxSizeNumber, tx_size_limit: txSizeLimitNumber}} = await fetch(ckbRpcUrl, fetchRequest4).then(res => res.json());
+
+		// Decode values.
+		orphanTxNumber = BigInt(orphanTxNumber);
+		pendingTxNumber = BigInt(pendingTxNumber);
+		proposedTxNumber = BigInt(proposedTxNumber);
+		totalTxCyclesNumber = BigInt(totalTxCyclesNumber);
+		totalTxSizeNumber = BigInt(totalTxSizeNumber);
+		txSizeLimitNumber = BigInt(txSizeLimitNumber);
+
+		// Fetch current data from the CKB node. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#method-get_block_by_number)
+		const jsonRpcRequest5 =
+		{
+			"id": 5,
+			"jsonrpc": "2.0",
+			"method": "get_block_by_number",
+			"params": ["0x"+blockNumber.toString(16), "0x2", true] // blockNumber pulled from get_tip_header().
+		};
+		const fetchRequest5 =
+		{
+			method: 'POST',
+			headers:
+			{
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(jsonRpcRequest5)
+		}
+		let {result: {block: {transactions: transactionsArray}, cycles: cyclesArray}} = await fetch(ckbRpcUrl, fetchRequest5).then(res => res.json());
+
+		// Decode values.
+		const historyState = {blockNumber: blockNumber, txCount: transactionsArray.length, cyclesConsumed: cyclesArray.map((x: string)=>Number(x)).reduce((a: number, b: number) => a+b, 0)};
+
+		// Update values.
+		const newCurrentData = {...currentData};
+		newCurrentData.block = blockNumber; // get_tip_header()
+		newCurrentData.epoch = epochNumber; // get_tip_header()
+		newCurrentData.epochIndex = epochIndex; // get_tip_header()
+		newCurrentData.epochLength = epochLength; // get_tip_header()
+		newCurrentData.chainType = chainTypeString; // get_blockchain_info()
+		newCurrentData.connections = connectionsNumber; // local_node_info()
+		newCurrentData.nodeVersion = nodeVersion; // local_node_info()
+		newCurrentData.orphan = orphanTxNumber; // tx_pool_info()
+		newCurrentData.pending = pendingTxNumber; // tx_pool_info()
+		newCurrentData.proposed = proposedTxNumber; // tx_pool_info()
+		newCurrentData.totalTxCycles = totalTxCyclesNumber; // tx_pool_info()
+		newCurrentData.txSize = totalTxSizeNumber; // tx_pool_info()
+		newCurrentData.minFeeRate = txSizeLimitNumber; // tx_pool_info()
+		newCurrentData.historyState = historyState; // get_block()
+		if(options.updateTargets)
+		{
+			newCurrentData.targetEpoch = targetEpoch; // get_tip_header()
+			newCurrentData.targetTime = targetTime; // get_tip_header()
+		}
+		setCurrentData(newCurrentData);
 	}
-	let {result: {block: {transactions: transactionsArray}, cycles: cyclesArray}} = await fetch(CKB_RPC_URL, fetchRequest5).then(res => res.json());
-
-	// Decode values.
-	const historyState = {blockNumber: blockNumber, txCount: transactionsArray.length, cyclesConsumed: cyclesArray.map((x: string)=>Number(x)).reduce((a: number, b: number) => a+b, 0)};
-
-	// Update values.
-	const newCurrentData = {...currentData};
-	newCurrentData.block = blockNumber; // get_tip_header()
-	newCurrentData.epoch = epochNumber; // get_tip_header()
-	newCurrentData.epochIndex = epochIndex; // get_tip_header()
-	newCurrentData.epochLength = epochLength; // get_tip_header()
-	newCurrentData.chainType = chainTypeString; // get_blockchain_info()
-	newCurrentData.connections = connectionsNumber; // local_node_info()
-	newCurrentData.nodeVersion = nodeVersion; // local_node_info()
-	newCurrentData.orphan = orphanTxNumber; // tx_pool_info()
-	newCurrentData.pending = pendingTxNumber; // tx_pool_info()
-	newCurrentData.proposed = proposedTxNumber; // tx_pool_info()
-	newCurrentData.totalTxCycles = totalTxCyclesNumber; // tx_pool_info()
-	newCurrentData.txSize = totalTxSizeNumber; // tx_pool_info()
-	newCurrentData.minFeeRate = txSizeLimitNumber; // tx_pool_info()
-	newCurrentData.historyState = historyState; // get_block()
-	if(options.updateTargets)
+	catch(error)
 	{
-		newCurrentData.targetEpoch = targetEpoch; // get_tip_header()
-		newCurrentData.targetTime = targetTime; // get_tip_header()
+		// Always dump the error to the console.
+		console.error(error);
+
+		// Attempt to trap the network error.
+		if((error as Error).name === "TypeError" && ((error as Error).message.startsWith("NetworkError") || (error as Error).message.startsWith("Failed to fetch")))
+			// Display a very specific error message if it is a network error message.
+			toast.error("Network Error: Do you have the correct Node RPC URL configured in the Settings?");
+		else
+			// Display a generic error message.
+			toast.error(`Error: An error occurred during the updating of the node data. More details are available in the developer console.`);
 	}
-	setCurrentData(newCurrentData);
 }
 
 /**
@@ -481,28 +517,60 @@ function updateAppDimensions()
 	document.documentElement.style.setProperty('--app-width', `${newWidth}px`);
 }
 
+/**
+ * Save the settings to LocalStorage within the browser.
+ * @param inputCkbRpcUrl A React reference to the input field for the CKB RPC URL.
+ * @param settings The current settings.
+ * @param setSettings A React function to set the current settings state variable.
+ */
+function saveSettings(inputCkbRpcUrl: React.MutableRefObject<null>, settings: SettingsObject, setSettings: React.Dispatch<React.SetStateAction<SettingsObject>>)
+{
+	const newSettings = {...settings};
+
+	const ckbRpcUrl = (inputCkbRpcUrl.current! as HTMLInputElement).value;
+	newSettings.ckbRpcUrl = ckbRpcUrl;
+
+	window.localStorage.setItem(LOCALSTORAGE_SETTINGS_KEY, JSON.stringify(newSettings));
+	setSettings(newSettings);
+}
+
 function App()
 {
 	const [currentData, setCurrentData] = useState(currentDataDefault);
 	const [countdown, setCountdown] = useState("");
+	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+	const [settings, setSettings] = useState({} as SettingsObject);
 	const [targetString, setTargetString] = useState("");
 	const [txHistory, setTxHistory] = useState(Array(50).fill({blockNumber: 0, cyclesConsumed: 0, txCount: 0}) as Array<HistoryState>);
+	const inputCkbRpcUrl = useRef(null);
 
-	// Update the dimension of the app and create an event listener to continue updating if the window size changes.
-	useEffect(()=>{ window.addEventListener('resize', updateAppDimensions); updateAppDimensions(); }, []);
+	useEffect(()=>
+	{
+		// Prepare the settings modal anchor point.
+		Modal.setAppElement('#root');
+
+		// Load the settings from LocalStorage.
+		const loadedSettings = JSON.parse(window.localStorage.getItem(LOCALSTORAGE_SETTINGS_KEY) || "{}");
+		if(!loadedSettings.ckbRpcUrl) loadedSettings.ckbRpcUrl = CKB_RPC_URL_DEFAULT;
+		setSettings(loadedSettings);
+
+		// Update the dimension of the app and create an event listener to continue updating if the window size changes.
+		window.addEventListener('resize', updateAppDimensions);
+		updateAppDimensions();
+	}, []);
 
 	// Update all data from the RPC immediately after first render. 
-	useEffect(()=>{updateData(currentDataDefault, setCurrentData);}, []);
+	useEffect(()=>{updateData(settings, currentDataDefault, setCurrentData);}, [settings]);
 
 	// Update the data from the RPC, but omit the target time and target epoch to allow the countdown to track more smoothly without retargeting every few seconds as a block is found. Update the tx history data with current data pulled from the RPC.
 	useInterval(()=>
 	{
-		updateData(currentData, setCurrentData, {updateTargets: false}); // Update all data except for the target data.
+		updateData(settings, currentData, setCurrentData, {updateTargets: false}); // Update all data except for the target data.
 		updateTxHistoryData(currentData.historyState, txHistory, setTxHistory); // Update the tx history data with the new RPC data.
 	}, REFRESH_DELAY);
 
 	// Update the all data from the RPC including targets. This will cause the countdown to readjust, which is why the frequency is less often.
-	useInterval(()=>{updateData(currentData, setCurrentData);}, FULL_REFRESH_DELAY);
+	useInterval(()=>{updateData(settings, currentData, setCurrentData);}, FULL_REFRESH_DELAY);
 
 	// Update the countdown and target string at the specified tick interval.
 	useInterval(()=>
@@ -513,38 +581,51 @@ function App()
 
 	const html =
 	(
-		<div className="App w-[var(--app-width)] h-[var(--app-height)] m-auto bg-gray-800 relative overflow-hidden">
-			<section className="w-[60px] p-[10px] min-h-[var(--app-height)] float-left bg-gray-700">
-				<a href="https://github.com/jordanmack/nervos-ckb-node-dashboard" target="_blank" rel="noreferrer">
-					<img src="nervos-logo-circle.png" className="w-[40px]" alt="Nervos Logo" />
-				</a>
-			</section>
-			<section className="mx-auto ml-[61px] grid grid-cols-6 gap-px">
-				{renderGridLarge("Block Number", currentData.block.toLocaleString())}
-				{renderGridLarge("Epoch", currentData.epoch.toLocaleString(), currentData.epochIndex.toLocaleString()+"/"+currentData.epochLength.toLocaleString())}
-				{renderGridLarge("Time to Halving", "", countdown)}
-				{renderGridLarge("Next Halving Target", "", targetString)}
-				{renderGridSmall("Pending TXs", currentData.pending.toLocaleString())}
-				{renderGridSmall("Proposed TXs", currentData.proposed.toLocaleString())}
-				{renderGridSmall("Orphan TXs", currentData.orphan.toLocaleString())}
-				{renderGridSmall("Total TX Cycles", currentData.totalTxCycles.toLocaleString())}
-				{renderGridSmall("Total TX Size", currentData.txSize.toLocaleString())}
-				{renderGridSmall("Minimum Fee Rate", currentData.minFeeRate.toLocaleString())}
-				{renderGridSmall("Connections", currentData.connections.toLocaleString())}
-				{renderGridSmall("Chain Type", currentData.chainType)}
-				{renderGridSmall("Node Version", currentData.nodeVersion.toLocaleString())}
-				<div className="inline-block relative bg-gray-800 h-[calc(var(--app-height)*170/480)] col-span-6">
-					{renderCharts(txHistory)}
+		<>
+			<div className="App w-[var(--app-width)] h-[var(--app-height)] m-auto bg-gray-800 relative overflow-hidden">
+				<section className="w-[60px] p-[10px] min-h-[var(--app-height)] float-left bg-gray-700">
+					<a href="https://github.com/jordanmack/nervos-ckb-node-dashboard" target="_blank" rel="noreferrer">
+						<img src="nervos-logo-circle.png" className="w-[40px]" alt="Nervos Logo" />
+					</a>
+					<button onClick={()=>setIsSettingsOpen(true)} className="absolute bottom-2"><img src="gear-icon.png" className="w-[40px] opacity-20" alt="Open Settings" /></button>
+				</section>
+				<section className="mx-auto ml-[61px] grid grid-cols-6 gap-px">
+					{renderGridLarge("Block Number", currentData.block.toLocaleString())}
+					{renderGridLarge("Epoch", currentData.epoch.toLocaleString(), currentData.epochIndex.toLocaleString()+"/"+currentData.epochLength.toLocaleString())}
+					{renderGridLarge("Time to Halving", "", countdown)}
+					{renderGridLarge("Next Halving Target", "", targetString)}
+					{renderGridSmall("Pending TXs", currentData.pending.toLocaleString())}
+					{renderGridSmall("Proposed TXs", currentData.proposed.toLocaleString())}
+					{renderGridSmall("Orphan TXs", currentData.orphan.toLocaleString())}
+					{renderGridSmall("Total TX Cycles", currentData.totalTxCycles.toLocaleString())}
+					{renderGridSmall("Total TX Size", currentData.txSize.toLocaleString())}
+					{renderGridSmall("Minimum Fee Rate", currentData.minFeeRate.toLocaleString())}
+					{renderGridSmall("Connections", currentData.connections.toLocaleString())}
+					{renderGridSmall("Chain Type", currentData.chainType)}
+					{renderGridSmall("Node Version", currentData.nodeVersion.toLocaleString())}
+					<div className="inline-block relative bg-gray-800 h-[calc(var(--app-height)*170/480)] col-span-6">
+						{renderCharts(txHistory)}
+					</div>
+				</section>
+				<footer className="text-center text-[0.65rem] pl-[61px] pb-1 absolute bottom-0 w-full text-slate-600">
+					Nervos CKB Node Dashboard v{process.env.REACT_APP_VERSION}.
+					{" "}
+					Made by the Nervos Community.
+					{" "}
+					Source available on <a href="https://github.com/jordanmack/nervos-ckb-node-dashboard" target="_blank" rel="noreferrer">GitHub</a>.
+				</footer>
+			</div>
+			<Modal isOpen={isSettingsOpen} contentLabel="Settings" style={{overlay: {backgroundColor: "#00000099"}, content: {backgroundColor: "#374151", border: "none", borderRadius: 20}}}>
+				<h2>Settings</h2>
+				<div className="relative border border-slate-600 rounded-lg block p-2.5 pt-6">
+					<span className="text-[0.7rem] text-slate-500 absolute top-1">CKB Node RPC URL</span>
+					<input type="text" className="w-full bg-slate-500 text-slate-300 p-2 rounded-sm" defaultValue={settings.ckbRpcUrl} ref={inputCkbRpcUrl} placeholder="eg: http://127.0.0.1:8114/" />
 				</div>
-			</section>
-			<footer className="text-center text-[0.65rem] pl-[61px] pb-1 absolute bottom-0 w-full text-slate-600">
-				Nervos CKB Node Dashboard v{process.env.REACT_APP_VERSION}.
-				{" "}
-				Made by the Nervos Community.
-				{" "}
-				Source available on <a href="https://github.com/jordanmack/nervos-ckb-node-dashboard" target="_blank" rel="noreferrer">GitHub</a>.
-			</footer>
-		</div>
+				<button onClick={()=>setIsSettingsOpen(false)}><img src="close-icon.png" className="w-[40px] opacity-40 absolute right-3 top-3" alt="Close Settings" /></button>
+				<button onClick={()=>{saveSettings(inputCkbRpcUrl, settings, setSettings);setIsSettingsOpen(false)}} className="border-2 border-[#e5e7eb] hover:bg-slate-400 focus:bg-slate-400 active:bg-slate-900 rounded-lg p-1 absolute right-3 bottom-3">Save</button>
+			</Modal>
+			<ToastContainer theme="dark" className="text-xs w-80" />
+		</>
 	);
 	return html;
 }
