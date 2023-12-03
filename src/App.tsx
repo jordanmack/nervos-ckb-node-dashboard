@@ -14,7 +14,7 @@ const HALVING_MESSAGE_HIDE_DELAY = 10 * 60 * 1000;	// The delay in milliseconds 
 const TICK_DELAY = 500;								// The delay in milliseconds to update the countdown.
 const REFRESH_DELAY = 1.7 * 1000;					// The delay in milliseconds to refresh the RPC data and update the current block and epoch.
 const FULL_REFRESH_DELAY = 5 * 60 * 1000;			// The delay in milliseconds to refresh all RPC data and update all current values and target values.
-const MAX_TX_HISTORY_COUNT = 50;					// The maximum number of entries in the TX history, used for the graph.
+const MAX_TX_HISTORY_COUNT = 100;					// The maximum number of entries in the TX history, used for the graph.
 
 /**
  * Types and Defaults
@@ -369,9 +369,9 @@ function renderGridLarge(label: string, value: string, smallValue?: string|undef
 	const smallString = (!!smallValue) ? <>{" "}<small>{smallValue}</small></> : null;
 	const html =
 	(
-		<div className="inline-block relative bg-gray-700 h-[70px] col-span-3">
+		<div className="inline-block relative bg-gray-700 h-[calc(var(--app-height)*70/480)] col-span-3">
 			<span className="absolute text-[0.7rem] text-slate-500 left-2.5 top-0.5">{label}</span>
-			<span className="block relative h-[50px] top-[20px] w-full bg-transparent text-slate-300 p-2.5 pt-1 text-4xl">{value}{smallString}</span>
+			<span className="block relative h-[calc(var(--app-height)*50/480)] top-[calc(var(--app-height)*20/480)] w-full bg-transparent text-slate-300 p-2.5 pt-1 text-4xl">{value}{smallString}</span>
 		</div>
 	);
 	return html;
@@ -389,16 +389,16 @@ function renderGridSmall(label: string, value: string, smallValue?: string|undef
 	const smallString = (!!smallValue) ? <>{" "}<small>{smallValue}</small></> : null;
 	const html =
 	(
-		<div className="inline-block relative bg-gray-700 h-[55px] col-span-2">
+		<div className="inline-block relative bg-gray-700 h-[calc(var(--app-height)*55/480)] col-span-2">
 			<span className="absolute text-[0.7rem] text-slate-500 left-2.5 top-0.5">{label}</span>
-			<span className="block relative h-[40px] top-[15px] w-full bg-transparent text-slate-300 p-2.5 pt-1 text-xl">{value}{smallString}</span>
+			<span className="block relative h-[calc(var(--app-height)*40/480)] top-[calc(var(--app-height)*15/480)] w-full bg-transparent text-slate-300 p-2.5 pt-1 text-xl">{value}{smallString}</span>
 		</div>
 	);
 	return html;
 }
 
 /**
- * 
+ * Renders the two charts on the bottom of the screen.
  * @param txHistory A populated HistoryState array containing the data to generate the chart from.
  * @returns Rendered React element containing the history charts.
  */
@@ -427,7 +427,7 @@ function renderCharts(txHistory: HistoryState[])
 	const html =
 	(
 		<>
-			<AreaChart width={739} height={69} data={txHistory} margin={{top: 2, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
+			<AreaChart width={window.innerWidth-61} height={calculateAppDimensions().height*69/480} data={txHistory} margin={{top: 2, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
 				<Tooltip content={()=>null} />
 				<defs>
 					<linearGradient id="colorGreenGradient" x1="0" y1="0" x2="0" y2="1">
@@ -437,7 +437,7 @@ function renderCharts(txHistory: HistoryState[])
 				</defs>
 				<Area type="monotone" dataKey="txCount" stroke="#3cc68a" fillOpacity={1} fill="url(#colorGreenGradient)" isAnimationActive={false} />
 			</AreaChart>
-			<AreaChart width={739} height={69} data={txHistory} margin={{top: 0, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
+			<AreaChart width={window.innerWidth-61} height={calculateAppDimensions().height*69/480} data={txHistory} margin={{top: 0, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
 				<Tooltip content={CustomTooltip} offset={50} position={{y: -35}} />
 				<defs>
 					<linearGradient id="purpleGreenGradient" x1="0" y1="0" x2="0" y2="1">
@@ -453,12 +453,43 @@ function renderCharts(txHistory: HistoryState[])
 	return html;
 }
 
+/**
+ * Calculates the dimensions of the application based on the window viewport size.
+ * @returns An object with the calculated height and width of the applicaiton.
+ */
+function calculateAppDimensions()
+{
+	let height = window.innerHeight;
+	let width = window.innerWidth;
+
+	if(height > 720) height = 720;
+	if(height < 480) height = 480;
+	if(width > 1280) width = 1280;
+	if(width < 800) width = 800;
+
+	return {height, width};
+}
+
+/**
+ * Updates the application height and width in the variables of the CSS :root element first defined in index.scss.
+ */
+function updateAppDimensions()
+{
+	const {height: newHeight, width: newWidth} = calculateAppDimensions();
+	
+	document.documentElement.style.setProperty('--app-height', `${newHeight}px`);
+	document.documentElement.style.setProperty('--app-width', `${newWidth}px`);
+}
+
 function App()
 {
 	const [currentData, setCurrentData] = useState(currentDataDefault);
 	const [countdown, setCountdown] = useState("");
 	const [targetString, setTargetString] = useState("");
 	const [txHistory, setTxHistory] = useState(Array(50).fill({blockNumber: 0, cyclesConsumed: 0, txCount: 0}) as Array<HistoryState>);
+
+	// Update the dimension of the app and create an event listener to continue updating if the window size changes.
+	useEffect(()=>{ window.addEventListener('resize', updateAppDimensions); updateAppDimensions(); }, []);
 
 	// Update all data from the RPC immediately after first render. 
 	useEffect(()=>{updateData(currentDataDefault, setCurrentData);}, []);
@@ -482,8 +513,8 @@ function App()
 
 	const html =
 	(
-		<div className="App max-w-[800px] h-[480px] m-auto bg-gray-800 relative overflow-hidden">
-			<section className="w-[60px] p-2.5 min-h-[480px] float-left bg-gray-700">
+		<div className="App w-[var(--app-width)] h-[var(--app-height)] m-auto bg-gray-800 relative overflow-hidden">
+			<section className="w-[60px] p-[10px] min-h-[var(--app-height)] float-left bg-gray-700">
 				<a href="https://github.com/jordanmack/nervos-ckb-node-dashboard" target="_blank" rel="noreferrer">
 					<img src="nervos-logo-circle.png" className="w-[40px]" alt="Nervos Logo" />
 				</a>
@@ -502,7 +533,7 @@ function App()
 				{renderGridSmall("Connections", currentData.connections.toLocaleString())}
 				{renderGridSmall("Chain Type", currentData.chainType)}
 				{renderGridSmall("Node Version", currentData.nodeVersion.toLocaleString())}
-				<div className="inline-block relative bg-gray-800 h-[170px] col-span-6">
+				<div className="inline-block relative bg-gray-800 h-[calc(var(--app-height)*170/480)] col-span-6">
 					{renderCharts(txHistory)}
 				</div>
 			</section>

@@ -8,6 +8,12 @@
 
 @layer base
 {
+	:root
+	{
+		--app-height: 480px; // This value will be updated by code in App.tsx.
+		--app-width: 800px; // This value will be updated by code in App.tsx.
+		font-size: calc(var(--app-height)*15/480); // This allows all the fonts used to scale based on the height.
+	}
 	body
 	{
 		@apply text-zinc-100 leading-relaxed;

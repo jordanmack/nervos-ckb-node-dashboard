@@ -8,7 +8,7 @@
 
 This is a web-based dashboard for monitoring a Nervos CKB L1 node. This allows full node operators to monitor their local node using a friendly UI/UX instead of having to rely exclusively on the console.
 
-The current version is specifically designed to fit a 7" Raspberry Pi screen with a resolution of 800x480. It can be used with higher resolutions, but it is not responsive. Support for more resolutions may be added in the future.
+The current version is specifically designed to fit a 5"-7" Raspberry Pi screen with a resolutions between 800x480 and 1280x720. Support for more resolutions may be added in the future.
 
 Note: This is not intended for use with a public node since it makes constant RPC requests and relies on methods which are not exposed on public nodes.
 
@@ -21,7 +21,7 @@ Note: This is not intended for use with a public node since it makes constant RP
 - Add additional statistics.
 - Add the ability to toggle between stat views.
 - Add support for batch RPC requests.
-- Add support for more resolutions.
+- ~~Add support for more resolutions.~~
 - Add support for public nodes.
 - Add support for websockets.
 - Add a help screen to describe what the stats are.
