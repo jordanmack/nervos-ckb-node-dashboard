@@ -551,12 +551,6 @@ function App()
 	(
 		<>
 			<div className="App w-[var(--app-width)] h-[var(--app-height)] m-auto bg-gray-800 relative overflow-hidden">
-				<section className="w-[60px] p-[10px] min-h-[var(--app-height)] float-left bg-gray-700">
-					<a href="https://github.com/jordanmack/nervos-ckb-node-dashboard" target="_blank" rel="noreferrer">
-						<img src="nervos-logo-circle.png" className="w-[40px]" alt="Nervos Logo" />
-					</a>
-					<button onClick={()=>setIsSettingsOpen(true)} className="absolute bottom-2"><img src="gear-icon.png" className="w-[40px] opacity-20" alt="Open Settings" /></button>
-				</section>
 				<section className="mx-auto ml-[61px] grid grid-cols-6 gap-px">
 					{renderGridLarge("Block Number", currentData.block.toLocaleString())}
 					{renderGridLarge("Epoch", currentData.epoch.toLocaleString(), currentData.epochIndex.toLocaleString()+"/"+currentData.epochLength.toLocaleString())}
@@ -582,6 +576,12 @@ function App()
 					{" "}
 					Source available on <a href="https://github.com/jordanmack/nervos-ckb-node-dashboard" target="_blank" rel="noreferrer">GitHub</a>.
 				</footer>
+				<section className="w-[60px] p-[10px] min-h-[var(--app-height)] absolute top-0 left-0 bg-gray-700">
+					<a href="https://github.com/jordanmack/nervos-ckb-node-dashboard" target="_blank" rel="noreferrer">
+						<img src="nervos-logo-circle.png" className="w-[40px]" alt="Nervos Logo" />
+					</a>
+					<button onClick={()=>setIsSettingsOpen(true)} className="absolute bottom-2"><img src="gear-icon.png" className="w-[40px] opacity-20" alt="Open Settings" /></button>
+				</section>
 			</div>
 			<Modal isOpen={isSettingsOpen} contentLabel="Settings" style={{overlay: {backgroundColor: "#00000099"}, content: {backgroundColor: "#374151", border: "none", borderRadius: 20}}}>
 				<h2>Settings</h2>
