@@ -35,6 +35,7 @@ http://ckb-node-dashboard.ckbdev.com/
 - ~~Add CKB node address configuration.~~
 - ~~Add support for more resolutions.~~
 - ~~Add support for batch RPC requests.~~
+- Use HTML grid instead of absolute height elements.
 - Add a help screen to describe what the stats are.
 - Add the ability to toggle between stat views.
 - Add support for light mode and dark mode.
