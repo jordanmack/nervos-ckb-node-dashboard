@@ -1,6 +1,6 @@
 {
   "name": "nervos-ckb-node-dashboard",
-  "version": "0.8.9",
+  "version": "0.8.10",
   "private": true,
   "dependencies": {
     "@types/node": "^20.11.5",
