@@ -442,7 +442,7 @@ function renderCharts(txHistory: HistoryState[])
 				</defs>
 				<Area type="monotone" dataKey="txCount" stroke="#3cc68a" fillOpacity={1} fill="url(#colorGreenGradient)" isAnimationActive={false} />
 			</AreaChart>
-			<AreaChart width={window.innerWidth-61} height={calculateAppDimensions().height*69/480} data={txHistory} margin={{top: 0, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
+			<AreaChart width={calculateAppDimensions().width-61} height={calculateAppDimensions().height*69/480} data={txHistory} margin={{top: 0, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
 				<Tooltip content={CustomTooltip} offset={50} position={{y: -35}} />
 				<defs>
 					<linearGradient id="purpleGreenGradient" x1="0" y1="0" x2="0" y2="1">
