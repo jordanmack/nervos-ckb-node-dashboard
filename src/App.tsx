@@ -238,6 +238,7 @@ async function updateData(settings: SettingsObject, currentData: CurrentData, se
 			headers:
 			{
 				'Content-Type': 'application/json',
+				'Cache-Control': 'no-cache',
 			},
 			body: JSON.stringify(jsonRpcRequest1)
 		}
@@ -431,7 +432,7 @@ function renderCharts(txHistory: HistoryState[])
 	const html =
 	(
 		<>
-			<AreaChart width={window.innerWidth-61} height={calculateAppDimensions().height*69/480} data={txHistory} margin={{top: 2, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
+			<AreaChart width={calculateAppDimensions().width-61} height={calculateAppDimensions().height*69/480} data={txHistory} margin={{top: 2, right: 0, bottom: 0, left: 0}} syncId="AreaChartSyncId">
 				<Tooltip content={()=>null} />
 				<defs>
 					<linearGradient id="colorGreenGradient" x1="0" y1="0" x2="0" y2="1">
