@@ -1,6 +1,6 @@
 {
   "name": "nervos-ckb-node-dashboard",
-  "version": "0.8.10",
+  "version": "0.8.11",
   "private": true,
   "dependencies": {
     "@radix-ui/react-switch": "^1.0.3",
