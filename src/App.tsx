@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import useInterval from 'react-useinterval';
 import {Area, AreaChart, Tooltip, TooltipProps} from 'recharts';
 import {ValueType, NameType} from 'recharts/types/component/DefaultTooltipContent';
+import * as Switch from '@radix-ui/react-switch';
 import Modal from 'react-modal';
 import {ToastContainer, toast} from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -11,6 +12,7 @@ import './App.scss';
  * Constants
  */
 const CKB_RPC_URL_DEFAULT = 'http://127.0.0.1:8114';	// The JSON RPC URL of the CKB Full Node to query.
+const CKB_RPC_PUBLIC_DEFAULT = false;					// The JSON RPC public mode default.
 const LOCALSTORAGE_SETTINGS_KEY = "settings";			// The key used with LocalStorage to store the application settings.
 const EPOCHS_PER_HALVING = 8760;						// The number of epochs per halving. This should never change.
 const HOURS_PER_EPOCH = 4;								// The number of hours per epoch. This should never change.
@@ -56,7 +58,8 @@ type CurrentData =
 /// An object which holds the application settings.
 type SettingsObject =
 {
-	ckbRpcUrl?: string,
+	ckbRpcUrl: string,
+	ckbRpcPublic: boolean
 };
 
 /// A time value separated into components for a future date.
@@ -93,6 +96,20 @@ const currentDataDefault: CurrentData =
 	targetTime: 0,
 	totalTxCycles: 0,
 	txSize: 0
+};
+
+/// The default values for a SettingsObject object.
+const settingsDefault: SettingsObject =
+{
+	ckbRpcUrl: CKB_RPC_URL_DEFAULT,
+	ckbRpcPublic: CKB_RPC_PUBLIC_DEFAULT
+};
+
+/// The default values for a SettingsObject object when in a "not loaded" state. This is the initial state before it is loaded from LocalStorage or settingsDefault.
+const settingsNotLoaded: SettingsObject =
+{
+	ckbRpcUrl: "",
+	ckbRpcPublic: false
 };
 
 /**
@@ -190,7 +207,7 @@ function generateCountdown(targetTime: number)
 async function updateData(settings: SettingsObject, currentData: CurrentData, setCurrentData: React.Dispatch<React.SetStateAction<CurrentData>>, options: {updateTargets: boolean}={updateTargets: true})
 {
 	// If no custom RPC URL is set, assume settings didn't load yet and skip with a console notice.
-	if(!settings.hasOwnProperty("ckbRpcUrl"))
+	if(!settings.ckbRpcUrl)
 	{
 		console.log("No CKB RPC URL was found. Still loading?");
 		return;
@@ -222,15 +239,15 @@ async function updateData(settings: SettingsObject, currentData: CurrentData, se
 			{
 				"id": 3,
 				"jsonrpc": "2.0",
-				"method": "local_node_info",
+				"method": "tx_pool_info",
 				"params": []
 			},
 			{
 				"id": 4,
 				"jsonrpc": "2.0",
-				"method": "tx_pool_info",
+				"method": "local_node_info",
 				"params": []
-			},	
+			},
 		];
 		const fetchRequest1 =
 		{
@@ -241,12 +258,13 @@ async function updateData(settings: SettingsObject, currentData: CurrentData, se
 				'Cache-Control': 'no-cache',
 			},
 			body: JSON.stringify(jsonRpcRequest1)
-		}
-		let results = await fetch(ckbRpcUrl, fetchRequest1).then(res => res.json());
-		let {result: {epoch: epochNumberWithFraction, number: blockNumber}} = results[0];
-		let {result: {chain: chainTypeString}} = results[1];
-		let {result: {connections: connectionsNumber, version: nodeVersion}} = results[2];
-		let {result: {orphan: orphanTxNumber, pending: pendingTxNumber, proposed: proposedTxNumber, total_tx_cycles: totalTxCyclesNumber, total_tx_size: totalTxSizeNumber, tx_size_limit: txSizeLimitNumber}} = results[3];
+		};
+		const results = await fetch(ckbRpcUrl, fetchRequest1).then(res => res.json());
+		let {result: {epoch: epochNumberWithFraction, number: blockNumber}} = results.find((x: any)=>x.id===1);
+		let {result: {chain: chainTypeString}} = results.find((x: any)=>x.id===2);
+		let {result: {orphan: orphanTxNumber, pending: pendingTxNumber, proposed: proposedTxNumber, total_tx_cycles: totalTxCyclesNumber, total_tx_size: totalTxSizeNumber, tx_size_limit: txSizeLimitNumber}} = results.find((x: any)=>x.id===3);
+		let connectionsNumber = -1, nodeVersion = "n/a"; // These values are only used the local_node_info() RPC call, which is not available on public nodes.
+		if(!settings.ckbRpcPublic) ({result: {connections: connectionsNumber, version: nodeVersion}} = results.find((x: any)=>x.id===4)); // Do not attempt to fetch these values if the result will not be available.
 
 		// Decode block number. (RPC Documentation: https://github.com/nervosnetwork/ckb/blob/master/rpc/README.md#type-blocknumber)
 		blockNumber = Number(blockNumber);
@@ -266,8 +284,8 @@ async function updateData(settings: SettingsObject, currentData: CurrentData, se
 
 		// Decode values.
 		chainTypeString = (chainTypeString === "ckb") ? "Mainnet" : "Testnet";
-		connectionsNumber = Number(connectionsNumber);
-		nodeVersion = "v" + nodeVersion.split(" ")[0]; // Take only the first version of the string.
+		if(!settings.ckbRpcPublic) connectionsNumber = Number(connectionsNumber);
+		if(!settings.ckbRpcPublic) nodeVersion = "v" + nodeVersion.split(" ")[0]; // Take only the first version of the string.
 		orphanTxNumber = BigInt(orphanTxNumber);
 		pendingTxNumber = BigInt(pendingTxNumber);
 		proposedTxNumber = BigInt(proposedTxNumber);
@@ -293,7 +311,7 @@ async function updateData(settings: SettingsObject, currentData: CurrentData, se
 			},
 			body: JSON.stringify(jsonRpcRequest5)
 		}
-		let {result: {block: {transactions: transactionsArray}, cycles: cyclesArray}} = await fetch(ckbRpcUrl, fetchRequest5).then(res => res.json());
+		const {result: {block: {transactions: transactionsArray}, cycles: cyclesArray}} = await fetch(ckbRpcUrl, fetchRequest5).then(res => res.json());
 
 		// Decode values.
 		const historyState = {blockNumber: blockNumber, txCount: transactionsArray.length, cyclesConsumed: cyclesArray.map((x: string)=>Number(x)).reduce((a: number, b: number) => a+b, 0)};
@@ -492,12 +510,15 @@ function updateAppDimensions()
  * @param settings The current settings.
  * @param setSettings A React function to set the current settings state variable.
  */
-function saveSettings(inputCkbRpcUrl: React.MutableRefObject<null>, settings: SettingsObject, setSettings: React.Dispatch<React.SetStateAction<SettingsObject>>)
+function saveSettings(inputCkbRpcUrl: React.MutableRefObject<null>, inputCkbRpcPublic: React.MutableRefObject<null>, settings: SettingsObject, setSettings: React.Dispatch<React.SetStateAction<SettingsObject>>)
 {
 	const newSettings = {...settings};
 
 	const ckbRpcUrl = (inputCkbRpcUrl.current! as HTMLInputElement).value;
 	newSettings.ckbRpcUrl = ckbRpcUrl;
+
+	const ckbRpcPublic = (inputCkbRpcPublic.current! as HTMLInputElement).dataset.state === "checked";
+	newSettings.ckbRpcPublic = ckbRpcPublic;
 
 	window.localStorage.setItem(LOCALSTORAGE_SETTINGS_KEY, JSON.stringify(newSettings));
 	setSettings(newSettings);
@@ -508,10 +529,11 @@ function App()
 	const [currentData, setCurrentData] = useState(currentDataDefault);
 	const [countdown, setCountdown] = useState("");
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-	const [settings, setSettings] = useState({} as SettingsObject);
+	const [settings, setSettings] = useState(settingsNotLoaded);
 	const [targetString, setTargetString] = useState("");
 	const [txHistory, setTxHistory] = useState(Array(50).fill({blockNumber: 0, cyclesConsumed: 0, txCount: 0}) as Array<HistoryState>);
 	const inputCkbRpcUrl = useRef(null);
+	const inputCkbRpcPublic = useRef(null);
 
 	useEffect(()=>
 	{
@@ -519,8 +541,7 @@ function App()
 		Modal.setAppElement('#root');
 
 		// Load the settings from LocalStorage.
-		const loadedSettings = JSON.parse(window.localStorage.getItem(LOCALSTORAGE_SETTINGS_KEY) || "{}");
-		if(!loadedSettings.ckbRpcUrl) loadedSettings.ckbRpcUrl = CKB_RPC_URL_DEFAULT;
+		const loadedSettings = JSON.parse(window.localStorage.getItem(LOCALSTORAGE_SETTINGS_KEY) || settingsDefault.toString());
 		setSettings(loadedSettings);
 
 		// Update the dimension of the app and create an event listener to continue updating if the window size changes.
@@ -529,7 +550,10 @@ function App()
 	}, []);
 
 	// Update all data from the RPC immediately after first render. 
-	useEffect(()=>{updateData(settings, currentDataDefault, setCurrentData);}, [settings]);
+	useEffect(()=>
+	{
+		updateData(settings, currentDataDefault, setCurrentData);
+	}, [settings]);
 
 	// Update the data from the RPC, but omit the target time and target epoch to allow the countdown to track more smoothly without retargeting every few seconds as a block is found. Update the tx history data with current data pulled from the RPC.
 	useInterval(()=>
@@ -563,7 +587,7 @@ function App()
 					{renderGridSmall("Total TX Cycles", currentData.totalTxCycles.toLocaleString())}
 					{renderGridSmall("Total TX Size", currentData.txSize.toLocaleString())}
 					{renderGridSmall("Minimum Fee Rate", currentData.minFeeRate.toLocaleString())}
-					{renderGridSmall("Connections", currentData.connections.toLocaleString())}
+					{renderGridSmall("Connections", (currentData.connections!==-1)?currentData.connections.toLocaleString():"n/a")}
 					{renderGridSmall("Chain Type", currentData.chainType)}
 					{renderGridSmall("Node Version", currentData.nodeVersion.toLocaleString())}
 					<div className="inline-block relative bg-gray-800 h-[calc(var(--app-height)*170/480)] col-span-6">
@@ -589,9 +613,14 @@ function App()
 				<div className="relative border border-slate-600 rounded-lg block p-2.5 pt-6">
 					<span className="text-[0.7rem] text-slate-500 absolute top-1">CKB Node RPC URL</span>
 					<input type="text" className="w-full bg-slate-500 text-slate-300 p-2 rounded-sm" defaultValue={settings.ckbRpcUrl} ref={inputCkbRpcUrl} placeholder="eg: http://127.0.0.1:8114/" />
+					<span className="text-[0.7rem] text-slate-500 mr-2">Public Node?</span>
+					<Switch.Root className="w-[42px] h-[25px] relative top-1 bg-black rounded-full relative data-[state=checked]:bg-[#3cc68a] outline-none cursor-pointer" defaultChecked={settings.ckbRpcPublic} ref={inputCkbRpcPublic}>
+						<Switch.Thumb className="block w-[21px] h-[21px] bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[19px]" />
+					</Switch.Root>
+					<span className="text-[0.7rem] text-slate-500 ml-2">(Warning: Using a public node may use a significant amount of bandwidth.)</span>
 				</div>
 				<button onClick={()=>setIsSettingsOpen(false)}><img src="close-icon.png" className="w-[40px] opacity-40 absolute right-3 top-3" alt="Close Settings" /></button>
-				<button onClick={()=>{saveSettings(inputCkbRpcUrl, settings, setSettings);setIsSettingsOpen(false)}} className="border-2 border-[#e5e7eb] hover:bg-slate-400 focus:bg-slate-400 active:bg-slate-900 rounded-lg p-1 absolute right-3 bottom-3">Save</button>
+				<button onClick={()=>{saveSettings(inputCkbRpcUrl, inputCkbRpcPublic, settings, setSettings);setIsSettingsOpen(false)}} className="border-2 border-[#e5e7eb] hover:bg-slate-400 focus:bg-slate-400 active:bg-slate-900 rounded-lg p-1 absolute right-3 bottom-3">Save</button>
 			</Modal>
 			<ToastContainer theme="dark" className="text-xs w-80" />
 		</>
