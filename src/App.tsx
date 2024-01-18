@@ -541,7 +541,15 @@ function App()
 		Modal.setAppElement('#root');
 
 		// Load the settings from LocalStorage.
-		const loadedSettings = JSON.parse(window.localStorage.getItem(LOCALSTORAGE_SETTINGS_KEY) || settingsDefault.toString());
+		let  loadedSettings;
+		try
+		{
+			loadedSettings = JSON.parse(window.localStorage.getItem(LOCALSTORAGE_SETTINGS_KEY) || settingsDefault.toString());			
+		}
+		catch
+		{
+			loadedSettings = settingsDefault;
+		}
 		setSettings(loadedSettings);
 
 		// Update the dimension of the app and create an event listener to continue updating if the window size changes.
