@@ -21,7 +21,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "react-scripts build && find build -name 'CLAUDE.md' -delete",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

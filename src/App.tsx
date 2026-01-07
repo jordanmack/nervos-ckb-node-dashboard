@@ -11,8 +11,8 @@ import './App.scss';
 /**
  * Constants
  */
-const CKB_RPC_URL_DEFAULT = 'http://127.0.0.1:8114';	// The JSON RPC URL of the CKB Full Node to query.
-const CKB_RPC_PUBLIC_DEFAULT = false;					// The JSON RPC public mode default.
+const CKB_RPC_URL_DEFAULT = 'https://rpc.ankr.com/nervos_ckb/efc49fb99eb7ca93a07557e97c0900f236f88d9c49a5f169f8f9c6963ed42f99';	// The JSON RPC URL of the CKB Full Node to query.
+const CKB_RPC_PUBLIC_DEFAULT = true;					// The JSON RPC public mode default.
 const LOCALSTORAGE_SETTINGS_KEY = "settings";			// The key used with LocalStorage to store the application settings.
 const EPOCHS_PER_HALVING = 8760;						// The number of epochs per halving. This should never change.
 const HOURS_PER_EPOCH = 4;								// The number of hours per epoch. This should never change.
@@ -584,6 +584,9 @@ function App()
 	(
 		<>
 			<div className="App w-[var(--app-width)] h-[var(--app-height)] m-auto bg-gray-800 relative overflow-hidden">
+				{settings.ckbRpcUrl === CKB_RPC_URL_DEFAULT && (
+					<div className="absolute top-2 right-2 bg-amber-500 text-black text-[0.6rem] font-bold px-2 py-0.5 rounded-full z-10">Demo</div>
+				)}
 				<section className="mx-auto ml-[61px] grid grid-cols-6 gap-px">
 					{renderGridLarge("Block Number", currentData.block.toLocaleString())}
 					{renderGridLarge("Epoch", currentData.epoch.toLocaleString(), currentData.epochIndex.toLocaleString()+"/"+currentData.epochLength.toLocaleString())}
@@ -613,6 +616,9 @@ function App()
 					<a href="https://github.com/jordanmack/nervos-ckb-node-dashboard" target="_blank" rel="noreferrer">
 						<img src="nervos-logo-circle.png" className="w-[40px]" alt="Nervos Logo" />
 					</a>
+					{settings.ckbRpcPublic && (
+						<div className="text-[0.5rem] text-center mt-2 text-amber-400 font-bold leading-tight">PUBLIC<br/>NODE</div>
+					)}
 					<button onClick={()=>setIsSettingsOpen(true)} className="absolute bottom-2"><img src="gear-icon.png" className="w-[40px] opacity-20" alt="Open Settings" /></button>
 				</section>
 			</div>
@@ -626,6 +632,11 @@ function App()
 						<Switch.Thumb className="block w-[21px] h-[21px] bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[19px]" />
 					</Switch.Root>
 					<span className="text-[0.7rem] text-slate-500 ml-2">(Warning: Using a public node may use a significant amount of bandwidth.)</span>
+					{settings.ckbRpcUrl === CKB_RPC_URL_DEFAULT && (
+						<div className="mt-3 p-2 bg-amber-900/50 border border-amber-600 rounded text-[0.7rem] text-amber-200">
+							<strong>Note:</strong> You are using the default demo RPC endpoint, which connects to a remote public node. This displays live network data, but node-specific information such as connections and version are unavailable. To monitor your own node, enter your local RPC URL above.
+						</div>
+					)}
 				</div>
 				<button onClick={()=>setIsSettingsOpen(false)}><img src="close-icon.png" className="w-[40px] opacity-40 absolute right-3 top-3" alt="Close Settings" /></button>
 				<button onClick={()=>{saveSettings(inputCkbRpcUrl, inputCkbRpcPublic, settings, setSettings);setIsSettingsOpen(false)}} className="border-2 border-[#e5e7eb] hover:bg-slate-400 focus:bg-slate-400 active:bg-slate-900 rounded-lg p-1 absolute right-3 bottom-3">Save</button>
