@@ -23,6 +23,7 @@ A live version of this app can be used at the URL below. Please pay attention to
 http://ckb-node-dashboard.ckbdev.com/
 
 ### Notes
+- The default RPC URL connects to a public node for demo purposes. To monitor your own node, open Settings and enter your local RPC URL (e.g., `http://127.0.0.1:8114`).
 - This live URL is **NOT** a secure URL on purpose since we need to make RPC requests to insecure sources.
 - Firefox is the recommended browser because it does not have the issues noted below.
 - Browsers based on the Chromium engine, such as Chrome, Opera, and Edge, disable access to local network resources by default. This gives a CORS error in the developer console: `The request client is not a secure context and the resource is in more-private address space private.` This can be reenabled by opening `about://flags#block-insecure-private-network-requests` in the browser, and setting `Block insecure private network requests` to `Disabled`.
