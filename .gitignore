@@ -182,3 +182,7 @@ sketch
 # End of https://www.toptal.com/developers/gitignore/api/react,visualstudiocode,node
 
 build
+
+# Ignore auto-generated folder context files (claude-mem)
+**/CLAUDE.md
+!CLAUDE.md
