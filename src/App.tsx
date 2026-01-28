@@ -11,7 +11,7 @@ import './App.scss';
 /**
  * Constants
  */
-const CKB_RPC_URL_DEFAULT = 'https://rpc.ankr.com/nervos_ckb/efc49fb99eb7ca93a07557e97c0900f236f88d9c49a5f169f8f9c6963ed42f99';	// The JSON RPC URL of the CKB Full Node to query.
+const CKB_RPC_URL_DEFAULT = 'https://mainnet.ckb.dev/rpc';	// The JSON RPC URL of the CKB Full Node to query.
 const CKB_RPC_PUBLIC_DEFAULT = true;					// The JSON RPC public mode default.
 const LOCALSTORAGE_SETTINGS_KEY = "settings";			// The key used with LocalStorage to store the application settings.
 const EPOCHS_PER_HALVING = 8760;						// The number of epochs per halving. This should never change.
